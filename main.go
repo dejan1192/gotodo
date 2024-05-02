@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	o "cli/todo/output"
 	"flag"
 	"fmt"
 	"os"
@@ -18,37 +19,6 @@ const (
 	ColorReset Color = "\033[0m"
 )
 
-type Output struct {
-	terminal bool
-}
-
-func CreateOutput() Output {
-	output := Output{
-		terminal: false,
-	}
-	o, _ := os.Stdout.Stat()
-	if (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
-		output.terminal = true
-	}
-	return output
-}
-func (o *Output) isTerminal() bool {
-	return o.terminal
-}
-
-func (o *Output) print(text string) {
-	fmt.Println(text)
-}
-
-func (o *Output) printf(format string, args ...interface{}) {
-	fmt.Printf(format, args...)
-}
-
-func (o *Output) ExitWithError(text string, exitCode int) {
-	fmt.Fprintf(os.Stderr, text)
-	os.Exit(exitCode)
-}
-
 var ignoreDirs = []string{".git"}
 
 func ExitAndPrint(e error) {
@@ -62,15 +32,23 @@ func UpdateProgress(filename string) {
 	fmt.Printf("\rProcessing file: %s", filename)
 }
 
-func (c Color) (str string) string {
+func (c Color) Apply(str string) string {
 	return string(c) + str + string(ColorReset)
 }
 
-func FindTodos(dir string, output *Output) {
+func GoPanic(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func FindTodos(dir string, output *o.Output) {
 
 	files, err := os.ReadDir(dir)
 
-	output.ExitWithError(err.Error())
+	if err != nil {
+		output.ExitWithError(err.Error(), 2)
+	}
 
 	for _, entry := range files {
 
@@ -78,16 +56,19 @@ func FindTodos(dir string, output *Output) {
 		filepath := fmt.Sprintf("%s/%s", dir, filename)
 
 		if entry.IsDir() {
-			if slices.Contains(ignoreDirs, filename) && output.isTerminal() {
-				if output.isTerminal(){
-					output.printf(ColorRed.Apply("Skipping ignored dir - %s\n"), filename)
+			if slices.Contains(ignoreDirs, filename) && output.IsTerminal() {
+				if output.IsTerminal() {
+					output.Printf(ColorRed.Apply("Skipping ignored dir - %s\n"), filename)
 				}
 				continue
 			}
 			FindTodos(filepath, output)
 		}
 		f, err := os.Open(filepath)
-		output.ExitWithError(err.Error())
+
+		if err != nil {
+			output.ExitWithError(err.Error(), 2)
+		}
 		scanner := bufio.NewScanner(f)
 
 		lineno := 1
@@ -101,10 +82,10 @@ func FindTodos(dir string, output *Output) {
 
 				line = ColorGreen.Apply(rawLine)
 
-				if output.isTerminal() {
-					output.printf(line)
+				if output.IsTerminal() {
+					output.Print(line)
 				} else {
-					output.printf("- [ ] %s\n", rawLine)
+					output.Printf("- [ ] %s\n", rawLine)
 				}
 			}
 			lineno++
@@ -120,7 +101,7 @@ func main() {
 
 	flag.Parse()
 
-	output := CreateOutput()
+	output := o.CreateOutput()
 	if len(os.Args) <= 1 {
 		output.ExitWithError("USAGE:  program <folder_name>", 1)
 	}
@@ -131,7 +112,10 @@ func main() {
 	}
 	stat, err := os.Stat(dir)
 
-	output.ExitWithError(err.Error(), 1)
+	if err != nil {
+		output.ExitWithError(err.Error(), 1)
+	}
+
 	if !stat.IsDir() {
 		output.ExitWithError(fmt.Sprintf("'%s' is not a directory\n", dir), 1)
 	}
