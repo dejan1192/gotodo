@@ -19,6 +19,11 @@ const (
 	ColorReset Color = "\033[0m"
 )
 
+var keywords = []string{
+	"TODO:",
+	"FIXME:",
+}
+
 var ignoreDirs = []string{".git"}
 
 func UpdateProgress(filename string) {
@@ -45,7 +50,7 @@ func FindTodos(dir string, output *o.Output) {
 		if entry.IsDir() {
 			if slices.Contains(ignoreDirs, filename) && output.IsTerminal() {
 				if output.IsTerminal() {
-					output.Printf(ColorRed.Apply("Skipping ignored dir - %s\n"), filename)
+					output.Printf(ColorRed.Apply("Skipping ignored dir - %s")+"\n", filename)
 				}
 				continue
 			}
@@ -62,19 +67,23 @@ func FindTodos(dir string, output *o.Output) {
 		for scanner.Scan() {
 			line := scanner.Text()
 
-			if strings.Contains(line, "TODO:") {
-				line = strings.Replace(line, "//", "", -1)
-				line = strings.Trim(line, " ")
-				rawLine := fmt.Sprintf("%d:%s - %s", lineno, filepath, line)
+			for _, keyword := range keywords {
+				if strings.Contains(line, keyword) {
+					line = strings.Replace(line, "//", "", -1)
+					line = strings.Trim(line, " ")
+					rawLine := fmt.Sprintf("%d:%s - %s", lineno, filepath, line)
 
-				line = ColorGreen.Apply(rawLine)
+					line = ColorGreen.Apply(rawLine)
 
-				if output.IsTerminal() {
-					output.Print(line)
-				} else {
-					output.Printf("- [ ] %s\n", rawLine)
+					if output.IsTerminal() {
+						output.Print(line)
+					} else {
+						output.Printf("- [ ] %s\n", rawLine)
+					}
 				}
+
 			}
+
 			lineno++
 		}
 

@@ -34,12 +34,12 @@ func captureOutput(f func()) string {
 	return buf.String()
 
 }
-
 func TestFindTodos(t *testing.T) {
 	todos := []string{
 		ColorGreen.Apply("5:testdir/another.php - TODO: Parse env arguments before running dirFindTodos"),
 		ColorGreen.Apply("3:testdir/internal/find.php - TODO: Find todos in a directory"),
 		ColorGreen.Apply("3:testdir/test.php - TODO: finish this class"),
+		ColorGreen.Apply("7:testdir/test.php - FIXME: Add variable types"),
 	}
 
 	res := captureOutput(func() {
@@ -51,12 +51,47 @@ func TestFindTodos(t *testing.T) {
 
 	filtered := []string{}
 
-	for _, str := range resSplit {
-		if str != "" {
-			filtered = append(filtered, str)
-		}
-	}
+	// Filter out empty
+	filtered = filter(resSplit, func(a string) bool { return a != "" })
+
 	if !reflect.DeepEqual(todos, filtered) {
 		t.Errorf("Expected %s got %s", todos, filtered)
 	}
+}
+func filter[T any](arr []T, f func(p T) bool) []T {
+	var result []T
+	for _, el := range arr {
+		if f(el) {
+			result = append(result, el)
+		}
+	}
+	return result
+}
+
+func TestExcludeDir(t *testing.T) {
+	todosSkipped := []string{
+		ColorGreen.Apply("5:testdir/another.php - TODO: Parse env arguments before running dirFindTodos"),
+		ColorRed.Apply("Skipping ignored dir - internal"),
+		ColorGreen.Apply("3:testdir/test.php - TODO: finish this class"),
+		ColorGreen.Apply("7:testdir/test.php - FIXME: Add variable types"),
+	}
+
+	ignoreDirs = append(ignoreDirs, "internal")
+
+	res := captureOutput(func() {
+		o := o.CreateOutput()
+		o.Terminal = true
+		FindTodos("testdir", &o)
+	})
+	resSplit := strings.Split(res, "\n")
+
+	filtered := []string{}
+
+	// Filter out empty
+	filtered = filter(resSplit, func(a string) bool { return a != "" })
+
+	if !reflect.DeepEqual(todosSkipped, filtered) {
+		t.Errorf("Expected %s got %s", todosSkipped, filtered)
+	}
+
 }
