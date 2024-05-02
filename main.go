@@ -21,25 +21,12 @@ const (
 
 var ignoreDirs = []string{".git"}
 
-func ExitAndPrint(e error) {
-	if e != nil {
-		fmt.Fprintln(os.Stderr, "ERROR: ", e)
-		os.Exit(1)
-	}
-}
-
 func UpdateProgress(filename string) {
 	fmt.Printf("\rProcessing file: %s", filename)
 }
 
 func (c Color) Apply(str string) string {
 	return string(c) + str + string(ColorReset)
-}
-
-func GoPanic(err error) {
-	if err != nil {
-		panic(err)
-	}
 }
 
 func FindTodos(dir string, output *o.Output) {
